@@ -1,0 +1,49 @@
+---
+cloud_controller_uri: api.vcap.me
+service:
+  name: vfdd
+  version: "0.9"
+  description: "vFabric Data Director"
+  plans: ['free']
+  tags: ['vfdd']
+ip_route: localhost
+#proxy:
+#   host: proxy
+#   port: 8080
+#   keepalive: true
+index: 0
+token: "0xdeadbeef"
+logging:
+  level: debug
+mbus: nats://localhost:4222
+pid: /var/vcap/sys/run/vfdd_service.pid
+
+# vfdd configuration
+# Not configured by default as it would require revealing
+# credentials to a non-local resource.
+vfdd:
+# vfdd connection information
+  host: "mgmt.vfdd.me"
+  port: 443
+  api_path: "/datadirector/api/v1"
+# LDAP server
+  nameserver: "ldap.vfdd.me"
+# credentials of vFDD
+  username: "change@me.com"
+  password: "changeme"
+# org/dbgroup name used for Cloud Foundry
+  org: "cloudfoundry"
+  dbgroup: "test"
+# database template and backup template, see vFDD documents for other options
+  template: "Tiny"
+  backup_template: "Disabled"
+# database pool size
+  min_pool_size: 3
+# the cycle to check database pool to provision new databases
+  db_pool_check_cycle: 30
+# the cycle to check whether there are dataabse to be deleted
+  db_cleanup_check_cycle: 60
+# timeout of vFDD operations
+  task_timeout: 300
+# the local database to keep temporarily data
+  local_db: sqlite3:/var/vcap/services/vfdd/vfdd_gateway.db

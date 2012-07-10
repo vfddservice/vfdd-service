@@ -1,0 +1,37 @@
+#!/usr/bin/env ruby
+#
+# Copyright (c) 2012 VMware, Inc. All Rights Reserved.
+# VMware copyrighted code is licensed to you under the Apache License, Version
+# 2.0 (the "License").  
+#
+# In addition to the VMware copyrighted code, vFabric Data Director Gateway for
+# Cloud Foundry includes a number of components with separate copyright notices
+# and license terms. Your use of these components is subject to the terms and
+# conditions of the component's license, as noted in the LICENSE file.
+
+
+ENV["BUNDLE_GEMFILE"] ||= File.expand_path("../../Gemfile", __FILE__)
+require 'bundler/setup'
+require 'vcap_services_base'
+
+$LOAD_PATH.unshift File.join(File.dirname(__FILE__), '..', 'lib')
+require 'vfdd_service/provisioner'
+require 'vfdd_service/vfdd_helper'
+
+class VCAP::Services::Vfdd::Gateway < VCAP::Services::Base::Gateway
+
+  def provisioner_class
+    VCAP::Services::Vfdd::Provisioner
+  end
+
+  def default_config_file
+    config_base_dir = ENV["CLOUD_FOUNDRY_CONFIG_PATH"] || File.join(File.dirname(__FILE__), '..', 'config')
+    File.join(config_base_dir, 'vfdd_gateway.yml')
+  end
+
+  def additional_options
+    {:vfdd => @config[:vfdd]}
+  end
+end
+
+VCAP::Services::Vfdd::Gateway.new.start

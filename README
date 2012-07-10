@@ -1,0 +1,102 @@
+Copyright (c) 2009-2012 VMware, Inc.
+VMware copyrighted code is licensed to you under the Apache License, Version
+2.0 (the "License").  
+
+In addition to the VMware copyrighted code, vFabric Data Director Gateway for
+Cloud Foundry includes a number of components with separate copyright notices
+and license terms. Your use of these components is subject to the terms and
+conditions of the component's license, as noted in the LICENSE file.
+
+== Installation notes
+
+To install and run vfdd (vFabric Data Director) service gateway, you must have 
+the Cloud Foundry vcap and vcap-services code properly deployed. The tested 
+versions are:
+cloudfoundry/vcap           commit: e6378a1d7987557cb9316e73124db37e1a3268c8
+cloudfoundry/vcap-services  commit: 867720a10b4b89b6258d1e8476fb36043a4639cf
+
+1. Install Cloud Foundry
+Follow the installation guide of the Cloud Foundry:
+https://github.com/cloudfoundry/vcap
+bash < <(curl -s -k -B https://raw.github.com/cloudfoundry/vcap/master/dev_setup/bin/vcap_dev_setup)
+
+2. Get a copy of vFDD service gateway code and copy (or link) it to the Cloud
+Foundry services directory.
+For example,
+ln -s ${PATH_TO_VFDD_SERVICE_PACKAGE}/vcap-services/vfdd \
+${PATH_OF_CLOUDFOUNDRY_INSTALLATION}/cloudfoundry/vcap/services/vfdd
+
+When you follow the guide in step 1, the PATH_OF_CLOUDFOUNDRY_INSTALLATION
+is default to your home path of the installation user.
+
+3. Install packages required by vfdd service gateway
+cd ${PATH_OF_CLOUDFOUNDRY_INSTALLATION}/cloudfoundry/vcap/services/vfdd
+bundle install --deployment
+If bundle is not available in the PATH variable, you can find it at the following 
+path (the ruby version may change):
+${PATH_OF_CLOUDFOUNDRY_INSTALLATION}/cloudfoundry/.deployments/devbox/deploy/ \
+rubies/ruby-1.9.2-p180/bin/
+
+4. Add vfdd as a new built-in service
+Edit the cloud_controller configuration file, which is located by default at
+${PATH_OF_CLOUDFOUNDRY_INSTALLATION}/cloudfoundry/.deployments/devbox/ \
+config/cloud_controller.yml,
+add vfdd service in 'builtin_services:' section and configure your own secret
+token, as the following,
+ vfdd:
+    token: changeme
+
+5. Configure vfdd service gateway
+The configuration file is located at,
+${PATH_OF_CLOUDFOUNDRY_INSTALLATION}/vcap-services/vfdd/config/vfdd_gateway.yml,
+you can edit it directly or make a copy. Read the comments in this file to make
+the configurations. At the same time, you need to create the parent directory 
+for the local database (which is default to /var/vcap/services/vfdd/).
+Note: special care should be taken for the mbus section, which should be configured
+correctly, you can follow the configurations of other components, for example,
+${PATH_OF_CLOUDFOUNDRY_INSTALLATION}/cloudfoundry/.deployments/devbox/ \
+config/mysql_gateway.yml
+
+6. [optional] This step is only needed is you want to start/stop vfdd service 
+gateway with 
+${PATH_OF_CLOUDFOUNDRY_INSTALLATION}/cloudfoundry/vcap/dev_setup/bin/vcap_dev
+command.
+1) Modify the following component configuration file to add "vfdd_gateway" at 
+the end of the list:
+${PATH_OF_CLOUDFOUNDRY_INSTALLATION}/cloudfoundry/.deployments/devbox/ \
+config/vcap_components.json
+
+2) Copy of link your vfdd service gateway configuration file to the default path,
+for example,
+ln -s ${PATH_OF_CLOUDFOUNDRY_INSTALLATION}/vcap-services/vfdd/config/vfdd_gateway.yml \
+${PATH_OF_CLOUDFOUNDRY_INSTALLATION}/cloudfoundry/.deployments/devbox/config/vfdd_gateway.yml
+
+3) Create an executable script named ${PATH_OF_CLOUDFOUNDRY_INSTALLATION}/ \
+cloudfoundry/vcap/bin/services/vfdd_gateway with contents:
+  #!/usr/bin/env ruby
+  exec(File.expand_path("../../../services/vfdd/bin/vfdd_gateway", __FILE__), *ARGV)
+
+== Internals of the service gateway
+
+To reduce the response time when the Cloud Foundry user request a vFDD 
+database, the provisioning of databases is based on a pooling mechanism. The 
+current pool policy is using fixed pool size (However, it's straight-forward to 
+add more intelligent policy which is sensitive to the current load). When the size 
+of the pool is under the target size, a background task will be started to 
+provision new databases (Currently, there is only one thread for this task at
+the same time). Similarly, the deletion of a database from vmc command is also 
+asynchronous. And a dedicated worker is used for the clean-up. There can also 
+be some cases which can cause the provisioning or deleting task fail, and 
+service gateway will mark the task as failed when a maximum retries are reached.
+To maintain the current databases which are created in the pool or being 
+provisioned/deleting or failed, a local sqlite database is used.
+
+To inspect the content of the database, the following command can be used:  
+bash$ sqlite3 /var/vcap/services/vfdd/vfdd_gateway.db (or other path configured)
+sqlite> select * from vcap_services_vfdd_provisioner_database_sets;
+creating
+pooled
+deleting
+failed
+sqlite> select * from vcap_services_vfdd_provisioner_databases;
+....
